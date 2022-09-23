@@ -1,9 +1,55 @@
-import type { NextPage } from "next";
+import type { GetServerSideProps, NextPage } from "next";
 import Head from "next/head";
-import Image from "next/image";
-import styles from "../styles/Home.module.css";
+import { useState } from "react";
+import { prisma } from "../lib/prisma";
+import { useRouter } from "next/router";
 
-const Home: NextPage = () => {
+interface Notes {
+  notes: { title: string; id: string; content: string }[];
+}
+interface FormData {
+  title: string;
+  content: string;
+  id: string;
+}
+
+const Home: NextPage<Notes> = ({ notes }) => {
+  const [form, setForm] = useState<FormData>({
+    title: "",
+    content: "",
+    id: "",
+  });
+  const router = useRouter();
+
+  const refreshData = () => {
+    router.replace(router.asPath);
+  };
+
+  async function create(data: FormData) {
+    try {
+      fetch("http://localhost:3000/api/create", {
+        body: JSON.stringify(data),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      }).then(() => {
+        setForm({ title: "", content: "", id: "" });
+        refreshData();
+      });
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  const handleSubmit = async (data: FormData) => {
+    try {
+      create(data);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   return (
     <>
       <Head>
@@ -38,9 +84,67 @@ const Home: NextPage = () => {
         />
         <meta property="twitter:image" content="" />
       </Head>
-      <h1 className="text-4xl font-bold text-indigo-500">Hello world!</h1>
+      <h1 className="mt-5 text-center text-4xl font-bold text-indigo-500">
+        Notes
+      </h1>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSubmit(form);
+        }}
+        className="mx-auto mt-2 max-w-2xl px-4 sm:px-0"
+      >
+        <label className="block">
+          <span className="text-gray-700">Title</span>
+          <input
+            type="text"
+            className="mt-1 block w-full rounded"
+            placeholder="Title"
+            value={form.title}
+            onChange={(e) => {
+              setForm({ ...form, title: e.target.value });
+            }}
+          />
+        </label>
+        <label className="mt-5 block">
+          <span className="text-gray-700">Content</span>
+          <textarea
+            className="mt-1 block w-full rounded"
+            placeholder="What's your next idea?"
+            rows={5}
+            value={form.content}
+            onChange={(e) => setForm({ ...form, content: e.target.value })}
+          ></textarea>
+        </label>
+        <button
+          type="submit"
+          className="mt-5 block w-full rounded border-2 border-solid border-indigo-500 bg-indigo-500 px-3 py-1 font-bold text-white hover:bg-transparent hover:text-indigo-500"
+        >
+          Add Note
+        </button>
+      </form>
+      <div className="mx-auto mt-2 max-w-2xl px-4 sm:px-0">
+        <ul>
+          {notes.map((note) => {
+            return (
+              <li key={note.id} className="mt-4 border-b border-indigo-700">
+                <h3 className="font-bold">{note.title}</h3>
+                <p className="mb-1 text-sm">{note.content}</p>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </>
   );
 };
 
 export default Home;
+
+export const getServerSideProps: GetServerSideProps = async () => {
+  const notes = await prisma.note.findMany({
+    select: { title: true, content: true, id: true },
+  });
+
+  return { props: { notes } };
+};
